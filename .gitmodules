@@ -1,0 +1,3 @@
+[submodule "my3d"]
+	path = my3d
+	url = ./my3d.git
