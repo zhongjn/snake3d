@@ -69,7 +69,7 @@ tuple<T> apply_dir_delta(tuple<T> pos, direction dir, T delta) {
 	return pos;
 }
 
-int main(int argc, char **argv) {
+int oldmain(int argc, char **argv) {
 	//printf("Press any key to start...");
 	//getchar();
 	system("cls");
