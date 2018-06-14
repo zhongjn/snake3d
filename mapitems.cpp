@@ -1,4 +1,6 @@
 #include "mapitems.h"
+#include <stdlib.h>
+#include <time.h>
 
 using my3d::Vertex;
 using my3d::Triangle;
@@ -88,7 +90,7 @@ Snake::Snake(tuple<int> head, float snake_width, Map map, direction dir, int len
 
 bool Snake::move()
 {
-    bool turned = false;
+    bool collide = false;
     head_offset += step_len;
     float block_dist = steps_per_block * step_len;
     if (head_offset >= block_dist) {
@@ -96,13 +98,18 @@ bool Snake::move()
         snake.pop_back();
         turn_info new_head = snake[0];
         new_head.block = apply_dir_delta_on_block(new_head.block, new_head.dir);
+        for (std::vector<turn_info>::iterator it = snake.begin() + 1; it != snake.end(); ++it) {
+            if (new_head.block.i == it->block.i && new_head.block.j == it->block.j) {
+                collide = true;
+                break;
+            }
+        }
         if (new_head.dir != next_dir) {
-            turned = true;
             new_head.dir = next_dir;
         }
         snake.insert(snake.begin(), new_head);
     }
-    return turned;
+    return collide;
 }
 
 void Snake::turn(direction dir)
@@ -123,7 +130,8 @@ void Snake::show(Context & context)
         context.draw_mesh(get_snake_body(it->block, it->dir, block_dist));
     }
     /* Draw tail */
-    context.draw_mesh(get_snake_body((snake.end() - 2)->block, dir_reverse(snake.back().dir), block_dist - head_offset + snake_width));
+    tuple<int> block = apply_dir_delta_on_block(snake.back().block, snake.back().dir);
+    context.draw_mesh(get_snake_body(block, dir_reverse(snake.back().dir), block_dist - head_offset + snake_width));
 
 
 }
@@ -269,9 +277,30 @@ tuple<int> Snake::apply_dir_delta_on_block(tuple<int> block, direction dir)
     return block;
 }
 
+tuple<float> Snake::apply_dir_delta_on_pos(tuple<float> pos, direction dir, float delta)
+{
+    switch (dir) {
+    case direction::i_p:
+        pos.i += delta; break;
+    case direction::i_n:
+        pos.i -= delta; break;
+    case direction::j_p:
+        pos.j += delta; break;
+    case direction::j_n:
+        pos.j -= delta; break;
+    }
+    return pos;
+}
+
 bool Snake::eat_food(Food food)
 {
-    return false;
+    bool eaten = false;
+    if (snake[0].block.i == food.coord.i && snake[0].block.j == food.coord.j) {
+        eaten = true;
+        snake.emplace(snake.end(), snake.back());
+        ++score;
+    }
+    return eaten;
 }
 
 tuple<float> Snake::get_head_pos(void)
@@ -288,15 +317,71 @@ direction Snake::get_head_dir(void)
     return snake[0].dir;
 }
 
-Food::Food(Map map, Snake snake)
+Food::Food(Map map, Snake snake) : block_dist(map.block_dist)
 {
     /* Generate a new food according to the size of the map */
     /* Avoid coord collide with snake */
+    update_coord(map, snake);
+
     /* Generate a mesh and store it */
+    std::vector<Vertex> vs;
+    Vertex v;
+    v.color = { 0 , 0 , 255 };
+    vs.emplace_back(v);
+    float w2 = map.block_size * 0.8 / 2;
+    v.position = { -w2,0.150000, w2 }; vs.emplace_back(v);
+    v.position = { -w2,0.150000,-w2 }; vs.emplace_back(v);
+    v.position = { w2,0.150000,w2 }; vs.emplace_back(v);
+    v.position = { w2,0.150000, -w2 }; vs.emplace_back(v);
+    v.position = { 0.000000,2.000000, 0.000000 }; vs.emplace_back(v);
+
+    std::vector<Triangle> ts;
+    ts.emplace_back(1, 2, 3);
+    ts.emplace_back(2, 3, 4);
+    ts.emplace_back(1, 2, 5);
+    ts.emplace_back(1, 3, 5);
+    ts.emplace_back(3, 4, 5);
+    ts.emplace_back(2, 4, 5);
+
+    out.accept_light = true;
+    out.triangles = ts;
+    out.vertexes = vs;
+    out.transformation = Transformation().translate(coord.j * block_dist, 0, coord.i * block_dist);
 }
 
 void Food::show(Context & context)
 {
     /* Show the mesh */
+    context.draw_mesh(out);
+}
+
+void Food::rotate(void)
+{
+    rotate_count = (rotate_count + 1) % FOOD_ROT_PERIOD;
+    out.transformation = Transformation().rotate(Y, rotate_count * M_PI / FOOD_ROT_PERIOD)
+        .translate(coord.j * block_dist, 0, coord.i * block_dist);
+}
+
+void Food::update_coord(Map map, Snake snake)
+{
+    srand(time(NULL));
+    bool valid = true;
+    while (1) {
+        coord.i = rand() % map.map_size;
+        coord.j = rand() % map.map_size;
+        valid = true;
+        for (turn_info segment : snake.snake) {
+            if (segment.block.i == coord.i && segment.block.j == coord.j) {
+                valid = false;
+                break;
+            }
+        }
+        if (valid) break;
+    }
+}
+
+tuple<int> Food::get_coord(void)
+{
+    return coord;
 }
 

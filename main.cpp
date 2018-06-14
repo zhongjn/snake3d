@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <stdio.h>
 #include "my3d/include/my3d.h"
 #include "my3d/include/my3dpresent.h"
 #include "mapitems.h"
@@ -17,7 +18,7 @@ const float cam_height = 7.2f;
 const float cam_pitch = 0.65f;
 const float cam_back = 8.0f;
 
-const int map_size = 40;
+const int map_size = 20;
 
 const float block_dist = 1.4f;
 const float block_size = 1.0f;
@@ -32,11 +33,14 @@ int main(int argc, char **argv) {
     getchar();
     system("cls");
 
-    float dr = 0;
-    int turn = 0;
 
     Map map = Map(map_size, block_dist, block_size, block_color, steps_per_block);
     Snake snake = Snake(start_block, 0.6 * block_size, map, i_p, 5);
+    Food food = Food(map, snake);
+
+    float dr = 0;
+    int turn = 0;
+    direction snake_dir = snake.get_head_dir();
 
     PointLight pl;
     pl.position = { 0, 3, 0 };
@@ -63,7 +67,7 @@ int main(int argc, char **argv) {
     while (true) {
 
         tuple<float> cur_pos = snake.get_head_pos();
-        float smooth_r = dr + snake.get_head_dir() * M_PI / 2;
+        float smooth_r = dr + snake_dir * M_PI / 2;
 
 #pragma region FPS
         frames++;
@@ -74,7 +78,7 @@ int main(int argc, char **argv) {
             prev = now;
             frames = 0;
             char title[50] = { 0 };
-            sprintf_s(title, "SnakeDemo FPS=%.2f cur_pos:(%.2f, %.2f)", (float)(100.0 / (d / 1000.0)), cur_pos.i, cur_pos.j);
+            sprintf_s(title, "SnakeDemo FPS=%.2f. Your score : %d", (float)(100.0 / (d / 1000.0)), snake.score);
             SetConsoleTitle(title);
         }
 #pragma endregion
@@ -91,6 +95,8 @@ int main(int argc, char **argv) {
 
         context.set_world_transformation(Transformation().translate(-cur_pos.j, 0, -cur_pos.i));
         map.show(context);
+        food.rotate();
+        food.show(context);
         snake.show(context);
 
         context.set_world_transformation(Transformation());
@@ -102,6 +108,7 @@ int main(int argc, char **argv) {
         present::set_all_pixels(context);
         present::present();
 
+        /* Change direction */
         if (_kbhit()) {
             int ch = _getch();
             if (ch == 224) {
@@ -120,9 +127,20 @@ int main(int argc, char **argv) {
         }
 
         if (snake.move()) {
+            /* Game over if the snake collide with its body */
+            break;
+        }
+        if (snake.eat_food(food)) {
+            food.update_coord(map, snake);
+        }
+        if (snake_dir != snake.get_head_dir()) {
+            snake_dir = snake.get_head_dir();
             dr = -turn * M_PI / 2;
         }
         dr *= 0.8;
     }
+    printf("Your score: %d\n", snake.score);
+    printf("Press any key to exit.\n");
+    getchar();
     return EXIT_SUCCESS;
 }

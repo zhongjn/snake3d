@@ -9,6 +9,7 @@ using my3d::Mesh;
 using my3d::Color;
 
 namespace mapitems {
+#define FOOD_ROT_PERIOD 120
 
     template<typename T>
     struct tuple {
@@ -58,37 +59,22 @@ namespace mapitems {
         bool eat_food(Food food);
         tuple<float> get_head_pos(void);
         direction get_head_dir(void);
+        int score;
 
-    private:
-        //0.6 * block_size
+    private:    
         std::vector<turn_info> snake;
         direction next_dir;
         float head_offset;
-        int score;
         int steps_per_block;
         float step_len;
         int map_size;
         float snake_width;
-        //Mesh get_snake_segment(float length);
         Mesh get_snake_head(turn_info head);
         Mesh get_snake_body(tuple<int> block, direction dir, float length);
         direction dir_reverse(direction dir);
         float dir_rotation(direction dir);
         tuple<int> apply_dir_delta_on_block(tuple<int> block, direction dir);
-        template<typename T>
-        tuple<T> apply_dir_delta_on_pos(tuple<T> pos, direction dir, T delta) {
-            switch (dir) {
-            case direction::i_p:
-                pos.i += delta; break;
-            case direction::i_n:
-                pos.i -= delta; break;
-            case direction::j_p:
-                pos.j += delta; break;
-            case direction::j_n:
-                pos.j -= delta; break;
-            }
-            return pos;
-        }
+        tuple<float> apply_dir_delta_on_pos(tuple<float> pos, direction dir, float delta);
     };
 
     class Food
@@ -97,9 +83,14 @@ namespace mapitems {
     public:
         Food(Map map, Snake snake);
         void show(Context& context);
+        void rotate(void);
+        void update_coord(Map map, Snake snake);
+        tuple<int> get_coord(void);
 
     private:
-        tuple<int> coord;
         Mesh out;
+        tuple<int> coord;
+        float block_dist;
+        int rotate_count;
     };
 }
